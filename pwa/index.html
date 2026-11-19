@@ -197,12 +197,15 @@
         </div>
       </div>
 
-      <!-- TAB 2: INTEGRATED EPUB READER -->
+      <!-- TAB 2: INTEGRATED EPUB READER (FULLSCREEN) -->
       <div id="tab-reader" class="tab-pane hidden">
-        <div class="reader-mobile-bar">
-          <button class="btn btn-outline btn-sm" id="btnMobileOpenToc" style="flex:1;">📑 Índice</button>
-          <button class="btn btn-outline btn-sm" id="btnReaderAppearanceMobile" style="flex:1;">Aa Apariencia</button>
-          <button class="btn btn-outline btn-sm" id="btnMobileOpenInsp" style="flex:1;">🧠 Capítulo</button>
+        <div class="reader-immersive-bar">
+          <button class="btn btn-outline btn-sm" id="btnExitReaderFullscreen" title="Salir del modo lectura">← Salir</button>
+          <div style="display:flex; gap:6px; flex:1; justify-content:flex-end;">
+            <button class="btn btn-outline btn-sm" id="btnMobileOpenToc">📑 Índice</button>
+            <button class="btn btn-outline btn-sm" id="btnReaderAppearanceMobile">Aa</button>
+            <button class="btn btn-outline btn-sm" id="btnMobileOpenInsp">🧠 Capítulo</button>
+          </div>
         </div>
 
         <div class="reader-layout">
@@ -302,14 +305,24 @@
           </div>
         </div>
 
-        <!-- Popover Flotante de Nota Kindle al tocar subrayado -->
+        <!-- Barra flotante al seleccionar texto -->
+        <div class="selection-action-bar hidden" id="readerSelectionBar">
+          <button type="button" class="btn btn-accent btn-sm" id="btnQuickHighlight">🖍️ Subrayar</button>
+          <button type="button" class="btn btn-primary btn-sm" id="btnQuickHighlightNote">📝 Nota</button>
+        </div>
+
+        <!-- Popover Flotante de Nota al tocar subrayado -->
         <div class="kindle-note-toast hidden" id="kindleNoteToast">
           <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px;">
-            <span class="chip accent" id="toastNoteMeta">Subrayado Kindle</span>
+            <span class="chip accent" id="toastNoteMeta">Subrayado</span>
             <button type="button" class="btn btn-outline btn-sm" id="btnCloseNoteToast" style="min-height:26px; padding:2px 8px;">✕</button>
           </div>
           <div id="toastNoteQuote" style="font-family:var(--font-serif); font-size:13.5px; color:var(--ink); margin-bottom:6px;"></div>
           <div id="toastNoteBody" class="note-user hidden" style="margin-top:4px;"></div>
+          <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:10px;">
+            <button type="button" class="btn btn-outline btn-sm" id="btnEditToastNote">✏️ Editar nota</button>
+            <button type="button" class="btn btn-danger btn-sm" id="btnDeleteToastNote">🗑️ Quitar</button>
+          </div>
         </div>
       </div>
 
@@ -384,6 +397,8 @@
             <option value="note">Notas sueltas</option>
             <option value="bookmark">Marcadores</option>
           </select>
+          <button type="button" class="btn btn-accent btn-sm" id="btnSyncKindlePdf" title="Combinar tus notas con un Bloc de notas Kindle (.pdf)">📥 Sincronizar PDF Kindle</button>
+          <input type="file" id="inputSyncKindlePdf" accept=".pdf,application/pdf" class="hidden">
         </div>
         <div id="notesStatsBar" class="muted" style="margin-bottom:12px;"></div>
         <div id="notesContainer"></div>
@@ -392,6 +407,22 @@
   </main>
 
   <div id="sheetBackdrop" class="sheet-backdrop hidden"></div>
+
+  <!-- MODAL CREAR / EDITAR NOTA EN LECTOR -->
+  <div id="userNoteModal" class="modal-backdrop hidden" style="z-index:95;">
+    <div class="modal" style="max-width:460px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <h3 style="margin:0; font-size:16px;" id="userNoteModalTitle">📝 Añadir nota</h3>
+        <button type="button" class="btn btn-outline btn-sm" id="btnUserNoteCancelX">✕</button>
+      </div>
+      <blockquote id="userNoteQuotePreview" style="margin:0 0 10px; padding:8px 10px; border-left:3px solid var(--accent); background:var(--surface-soft); font-family:var(--font-serif); font-size:13px; max-height:110px; overflow-y:auto;"></blockquote>
+      <textarea id="inputUserNoteText" class="input" rows="4" style="width:100%; resize:vertical; font-family:inherit;" placeholder="Escribe tu reflexión o comentario sobre este fragmento…"></textarea>
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px;">
+        <button type="button" class="btn btn-outline btn-sm" id="btnUserNoteCancel">Cancelar</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btnUserNoteSave">Guardar</button>
+      </div>
+    </div>
+  </div>
 
   <!-- MODAL TÉCNICAS DE ANÁLISIS (SENCILLO / TÉCNICO) -->
   <div id="techInfoModal" class="modal-backdrop hidden">

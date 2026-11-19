@@ -166,6 +166,7 @@ class BiblioDB {
               pdf_chapter_label: note.pdf_chapter_label || null,
               page_number: note.page_number ?? null,
               note_type: note.note_type || 'highlight',
+              source: note.source || 'kindle',
               highlight_color: note.highlight_color || null,
               highlight_text: note.highlight_text || null,
               user_note: note.user_note || null,
@@ -640,6 +641,255 @@ class BiblioDB {
           };
         });
       };
+    });
+  }
+  async addUserNote({ book_id, chapter_id, highlight_text, user_note = null, highlight_color = 'yellow' }) {
+    const db = await this.open();
+    const bookId = Number(book_id);
+    const chId = chapter_id ? Number(chapter_id) : null;
+    const nowIso = new Date().toISOString();
+
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(['notes', 'chapters', 'books'], 'readwrite');
+      tx.onerror = () => reject(tx.error || new Error('Error guardando nota.'));
+      let savedNote = null;
+      tx.oncomplete = () => resolve(savedNote);
+
+      const notesStore = tx.objectStore('notes');
+      const existingReq = notesStore.index('by_book').getAll(IDBKeyRange.only(bookId));
+      existingReq.onsuccess = () => {
+        const list = existingReq.result || [];
+        const maxSort = list.reduce((m, n) => Math.max(m, Number(n.sort_order || 0)), 0);
+        const record = {
+          book_id: bookId,
+          chapter_id: chId,
+          pdf_chapter_label: null,
+          page_number: null,
+          note_type: highlight_text ? 'highlight' : 'note',
+          source: 'app',
+          highlight_color,
+          highlight_text: highlight_text ? String(highlight_text).trim() : null,
+          user_note: user_note ? String(user_note).trim() : null,
+          note_date: nowIso,
+          match_confidence: 1,
+          sort_order: maxSort + 1
+        };
+        const addReq = notesStore.add(record);
+        addReq.onsuccess = () => {
+          savedNote = { ...record, id: Number(addReq.result) };
+        };
+
+        const bookReq = tx.objectStore('books').get(bookId);
+        bookReq.onsuccess = () => {
+          const b = bookReq.result;
+          if (b) {
+            b.notes_count = Number(b.notes_count || 0) + 1;
+            tx.objectStore('books').put(b);
+          }
+        };
+        if (chId) {
+          const chReq = tx.objectStore('chapters').get(chId);
+          chReq.onsuccess = () => {
+            const c = chReq.result;
+            if (c) {
+              c.notes_count = Number(c.notes_count || 0) + 1;
+              tx.objectStore('chapters').put(c);
+            }
+          };
+        }
+      };
+    });
+  }
+
+  async updateNote(noteId, patch = {}) {
+    const db = await this.open();
+    const id = Number(noteId);
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('notes', 'readwrite');
+      tx.onerror = () => reject(tx.error || new Error('Error actualizando nota.'));
+      let updated = null;
+      tx.oncomplete = () => resolve(updated);
+
+      const store = tx.objectStore('notes');
+      const req = store.get(id);
+      req.onsuccess = () => {
+        const cur = req.result;
+        if (!cur) return;
+        updated = {
+          ...cur,
+          user_note: patch.user_note !== undefined ? (patch.user_note ? String(patch.user_note).trim() : null) : cur.user_note,
+          highlight_color: patch.highlight_color !== undefined ? patch.highlight_color : cur.highlight_color
+        };
+        store.put(updated);
+      };
+    });
+  }
+
+  async deleteNote(noteId) {
+    const db = await this.open();
+    const id = Number(noteId);
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(['notes', 'chapters', 'books'], 'readwrite');
+      tx.onerror = () => reject(tx.error || new Error('Error eliminando nota.'));
+      tx.oncomplete = () => resolve({ ok: true });
+
+      const notesStore = tx.objectStore('notes');
+      const req = notesStore.get(id);
+      req.onsuccess = () => {
+        const n = req.result;
+        if (!n) return;
+        notesStore.delete(id);
+        const bookReq = tx.objectStore('books').get(Number(n.book_id));
+        bookReq.onsuccess = () => {
+          const b = bookReq.result;
+          if (b) {
+            b.notes_count = Math.max(0, Number(b.notes_count || 0) - 1);
+            tx.objectStore('books').put(b);
+          }
+        };
+        if (n.chapter_id) {
+          const chReq = tx.objectStore('chapters').get(Number(n.chapter_id));
+          chReq.onsuccess = () => {
+            const c = chReq.result;
+            if (c) {
+              c.notes_count = Math.max(0, Number(c.notes_count || 0) - 1);
+              tx.objectStore('chapters').put(c);
+            }
+          };
+        }
+      };
+    });
+  }
+
+  /**
+   * Sincroniza notas importadas de Kindle con las notas ya tomadas en LeeMe,
+   * fusionando duplicados y conservando todas las notas personales del usuario.
+   */
+  async syncKindleNotes(bookId, alignedNotes) {
+    const db = await this.open();
+    const bid = Number(bookId);
+    const norm = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(['notes', 'chapters', 'books'], 'readwrite');
+      let summary = { added: 0, merged: 0, total: 0 };
+      tx.onerror = () => reject(tx.error || new Error('Error sincronizando notas Kindle.'));
+      tx.oncomplete = () => resolve(summary);
+
+      const notesStore = tx.objectStore('notes');
+      const chStore = tx.objectStore('chapters');
+      const bookStore = tx.objectStore('books');
+
+      const chReq = chStore.index('by_book').getAll(IDBKeyRange.only(bid));
+      const notesReq = notesStore.index('by_book').getAll(IDBKeyRange.only(bid));
+
+      tx._chList = null;
+      tx._existing = null;
+
+      const runSync = () => {
+        if (!tx._chList || !tx._existing) return;
+        const chIdxToId = {};
+        for (const c of tx._chList) chIdxToId[c.chapter_index] = c.id;
+
+        const existing = tx._existing;
+        const chCounts = {};
+        for (const e of existing) {
+          if (e.chapter_id) chCounts[e.chapter_id] = (chCounts[e.chapter_id] || 0) + 1;
+        }
+        let maxSort = existing.reduce((m, n) => Math.max(m, Number(n.sort_order || 0)), 0);
+
+        for (const inc of (alignedNotes || [])) {
+          const chId = (inc.matched_chapter_index !== null && inc.matched_chapter_index !== undefined)
+            ? (chIdxToId[inc.matched_chapter_index] || null)
+            : null;
+          const incNorm = norm(inc.highlight_text);
+
+          // Buscar coincidencia con notas existentes (del usuario o Kindle previo)
+          let match = null;
+          if (incNorm.length >= 10) {
+            match = existing.find((e) => {
+              if (chId && e.chapter_id && Number(e.chapter_id) !== Number(chId)) return false;
+              const eNorm = norm(e.highlight_text);
+              if (!eNorm) return false;
+              if (eNorm === incNorm) return true;
+              const shorter = eNorm.length < incNorm.length ? eNorm : incNorm;
+              const longer = eNorm.length < incNorm.length ? incNorm : eNorm;
+              return shorter.length >= 25 && longer.includes(shorter);
+            });
+          } else if (inc.note_type === 'bookmark' && inc.page_number) {
+            match = existing.find((e) => e.note_type === 'bookmark' && e.page_number === inc.page_number);
+          }
+
+          if (match) {
+            let changed = false;
+            const incUser = (inc.user_note || '').trim();
+            const curUser = (match.user_note || '').trim();
+            if (incUser && !curUser) {
+              match.user_note = incUser;
+              changed = true;
+            } else if (incUser && curUser && !norm(curUser).includes(norm(incUser))) {
+              match.user_note = `${curUser}\n[Kindle]: ${incUser}`;
+              changed = true;
+            }
+            if (match.source === 'app') {
+              match.source = 'synced';
+              changed = true;
+            }
+            if (!match.page_number && inc.page_number) {
+              match.page_number = inc.page_number;
+              changed = true;
+            }
+            if (!match.pdf_chapter_label && inc.pdf_chapter_label) {
+              match.pdf_chapter_label = inc.pdf_chapter_label;
+              changed = true;
+            }
+            if (changed) {
+              notesStore.put(match);
+            }
+            summary.merged++;
+          } else {
+            maxSort++;
+            const rec = {
+              book_id: bid,
+              chapter_id: chId,
+              pdf_chapter_label: inc.pdf_chapter_label || null,
+              page_number: inc.page_number ?? null,
+              note_type: inc.note_type || 'highlight',
+              source: 'kindle',
+              highlight_color: inc.highlight_color || null,
+              highlight_text: inc.highlight_text || null,
+              user_note: inc.user_note || null,
+              note_date: inc.note_date || null,
+              match_confidence: Number(inc.match_confidence || 0),
+              sort_order: maxSort
+            };
+            notesStore.add(rec);
+            existing.push(rec);
+            if (chId) chCounts[chId] = (chCounts[chId] || 0) + 1;
+            summary.added++;
+          }
+        }
+
+        summary.total = existing.length;
+        for (const c of tx._chList) {
+          const cnt = chCounts[c.id] || 0;
+          if (Number(c.notes_count || 0) !== cnt) {
+            c.notes_count = cnt;
+            chStore.put(c);
+          }
+        }
+        const bReq = bookStore.get(bid);
+        bReq.onsuccess = () => {
+          const b = bReq.result;
+          if (b) {
+            b.notes_count = existing.length;
+            bookStore.put(b);
+          }
+        };
+      };
+
+      chReq.onsuccess = () => { tx._chList = chReq.result || []; runSync(); };
+      notesReq.onsuccess = () => { tx._existing = notesReq.result || []; runSync(); };
     });
   }
 }

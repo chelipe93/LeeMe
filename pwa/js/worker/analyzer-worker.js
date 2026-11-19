@@ -128,7 +128,26 @@ function alignNotesToChapters(notes, chapters) {
 
 self.onmessage = async (event) => {
   const msg = event.data;
-  if (!msg || msg.type !== 'analyze') return;
+  if (!msg) return;
+
+  if (msg.type === 'parse_kindle') {
+    try {
+      const { KindleNotesParser } = self.BiblioWorker;
+      const kp = new KindleNotesParser();
+      const parsedNotes = await kp.parse(msg.pdfBuffer);
+      const chapters = (msg.chapters || []).map((c) => ({
+        ...c,
+        plain_text: c.plain_text || String(c.html_content || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+      }));
+      const alignedNotes = alignNotesToChapters(parsedNotes.items || [], chapters);
+      self.postMessage({ type: 'kindle_parsed', notes: alignedNotes, stats: parsedNotes.stats });
+    } catch (err) {
+      self.postMessage({ type: 'error', message: err?.message || 'Error leyendo PDF Kindle.' });
+    }
+    return;
+  }
+
+  if (msg.type !== 'analyze') return;
 
   const progress = (pct, text) => self.postMessage({ type: 'progress', pct, message: text });
 

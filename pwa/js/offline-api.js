@@ -171,6 +171,56 @@ class OfflineAPIImpl {
     return this.db.saveProgress(payload);
   }
 
+  async addUserNote(payload) {
+    return this.db.addUserNote(payload);
+  }
+
+  async updateNote(noteId, patch) {
+    return this.db.updateNote(noteId, patch);
+  }
+
+  async deleteNote(noteId) {
+    return this.db.deleteNote(noteId);
+  }
+
+  async syncKindlePdf(bookId, pdfFile) {
+    const detail = await this.db.getBookDetail(bookId);
+    const chapters = [];
+    for (const ch of (detail.chapters || [])) {
+      const full = await this.db.getChapterContent(ch.id);
+      chapters.push({
+        chapter_index: ch.chapter_index,
+        title: ch.title,
+        display_title: ch.display_title,
+        is_front_matter: ch.is_front_matter,
+        word_count: ch.word_count,
+        html_content: full?.html_content || ''
+      });
+    }
+    const pdfBuffer = await pdfFile.arrayBuffer();
+    const parsed = await new Promise((resolve, reject) => {
+      const worker = new Worker('./js/worker/analyzer-worker.js');
+      worker.onmessage = (ev) => {
+        const msg = ev.data;
+        if (!msg) return;
+        if (msg.type === 'kindle_parsed') {
+          worker.terminate();
+          resolve(msg);
+        } else if (msg.type === 'error') {
+          worker.terminate();
+          reject(new Error(msg.message));
+        }
+      };
+      worker.onerror = (err) => {
+        worker.terminate();
+        reject(new Error(err.message || 'Error procesando PDF Kindle.'));
+      };
+      worker.postMessage({ type: 'parse_kindle', pdfBuffer, chapters }, [pdfBuffer]);
+    });
+    const syncRes = await this.db.syncKindleNotes(bookId, parsed.notes || []);
+    return { ok: true, ...syncRes };
+  }
+
   async exportBookBackup(bookId) {
     return this.db.exportBookBackup(bookId);
   }

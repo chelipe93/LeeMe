@@ -1,7 +1,7 @@
 /**
  * Service Worker de LeeMe PWA: precaché completa y scope dinámico para GitHub Pages / LAN.
  */
-const CACHE_NAME = 'leeme-pwa-v8';
+const CACHE_NAME = 'leeme-pwa-v9';
 
 const ASSETS_TO_CACHE = [
   './',

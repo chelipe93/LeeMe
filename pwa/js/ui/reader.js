@@ -5,9 +5,15 @@
 class EpubReaderController {
   constructor(callbacks = {}) {
     this.onNavigateCharacter = callbacks.onNavigateCharacter || (() => {});
+    this.onCreateNote = callbacks.onCreateNote || (async () => null);
+    this.onUpdateNote = callbacks.onUpdateNote || (async () => null);
+    this.onDeleteNote = callbacks.onDeleteNote || (async () => null);
     this.bookData = null;
     this.currentChapterId = null;
     this.currentChapterNotes = [];
+    this.activeToastNote = null;
+    this.pendingSelectionText = '';
+    this.editingNote = null;
     this.fontSize = 18;
     this.fontSans = false;
     this.theme = 'paper';
@@ -47,6 +53,18 @@ class EpubReaderController {
       toastNoteQuote: document.getElementById('toastNoteQuote'),
       toastNoteBody: document.getElementById('toastNoteBody'),
       btnCloseNoteToast: document.getElementById('btnCloseNoteToast'),
+      btnEditToastNote: document.getElementById('btnEditToastNote'),
+      btnDeleteToastNote: document.getElementById('btnDeleteToastNote'),
+      selectionBar: document.getElementById('readerSelectionBar'),
+      btnQuickHighlight: document.getElementById('btnQuickHighlight'),
+      btnQuickHighlightNote: document.getElementById('btnQuickHighlightNote'),
+      userNoteModal: document.getElementById('userNoteModal'),
+      userNoteModalTitle: document.getElementById('userNoteModalTitle'),
+      userNoteQuotePreview: document.getElementById('userNoteQuotePreview'),
+      inputUserNoteText: document.getElementById('inputUserNoteText'),
+      btnUserNoteSave: document.getElementById('btnUserNoteSave'),
+      btnUserNoteCancel: document.getElementById('btnUserNoteCancel'),
+      btnUserNoteCancelX: document.getElementById('btnUserNoteCancelX'),
       inspSummary: document.getElementById('readerInspectorSummary'),
       inspKeywords: document.getElementById('readerInspectorKeywords'),
       inspChars: document.getElementById('readerInspectorChars'),
@@ -83,6 +101,108 @@ class EpubReaderController {
     this.els.btnCloseAppearance?.addEventListener('click', () => this.closeAllSheets());
     this.els.sheetBackdrop?.addEventListener('click', () => this.closeAllSheets());
     this.els.btnCloseNoteToast?.addEventListener('click', () => this.els.noteToast?.classList.add('hidden'));
+
+    // Selección de texto para subrayar y crear notas
+    let selTimer = null;
+    const checkSelection = () => {
+      if (!this.currentChapterId || !this.els.viewport) return;
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || !sel.rangeCount) {
+        this.els.selectionBar?.classList.add('hidden');
+        this.pendingSelectionText = '';
+        return;
+      }
+      const range = sel.getRangeAt(0);
+      if (!this.els.viewport.contains(range.commonAncestorContainer)) {
+        this.els.selectionBar?.classList.add('hidden');
+        this.pendingSelectionText = '';
+        return;
+      }
+      const txt = sel.toString().replace(/\s+/g, ' ').trim();
+      if (txt.length >= 4) {
+        this.pendingSelectionText = txt;
+        this.els.selectionBar?.classList.remove('hidden');
+      } else {
+        this.pendingSelectionText = '';
+        this.els.selectionBar?.classList.add('hidden');
+      }
+    };
+    document.addEventListener('selectionchange', () => {
+      clearTimeout(selTimer);
+      selTimer = setTimeout(checkSelection, 160);
+    });
+
+    const closeNoteModal = () => {
+      this.els.userNoteModal?.classList.add('hidden');
+      this.editingNote = null;
+    };
+    this.els.btnUserNoteCancel?.addEventListener('click', closeNoteModal);
+    this.els.btnUserNoteCancelX?.addEventListener('click', closeNoteModal);
+    this.els.userNoteModal?.addEventListener('click', (e) => {
+      if (e.target === this.els.userNoteModal) closeNoteModal();
+    });
+
+    this.els.btnQuickHighlight?.addEventListener('click', async () => {
+      const txt = this.pendingSelectionText;
+      if (!txt || !this.currentChapterId) return;
+      window.getSelection()?.removeAllRanges();
+      this.els.selectionBar?.classList.add('hidden');
+      await this.onCreateNote({
+        chapter_id: this.currentChapterId,
+        highlight_text: txt,
+        user_note: null
+      });
+    });
+
+    this.els.btnQuickHighlightNote?.addEventListener('click', () => {
+      const txt = this.pendingSelectionText;
+      if (!txt || !this.currentChapterId) return;
+      this.editingNote = { mode: 'create', highlight_text: txt };
+      if (this.els.userNoteModalTitle) this.els.userNoteModalTitle.textContent = '📝 Subrayar y añadir nota';
+      if (this.els.userNoteQuotePreview) this.els.userNoteQuotePreview.textContent = `«${txt}»`;
+      if (this.els.inputUserNoteText) this.els.inputUserNoteText.value = '';
+      window.getSelection()?.removeAllRanges();
+      this.els.selectionBar?.classList.add('hidden');
+      this.els.userNoteModal?.classList.remove('hidden');
+      setTimeout(() => this.els.inputUserNoteText?.focus(), 60);
+    });
+
+    this.els.btnEditToastNote?.addEventListener('click', () => {
+      const note = this.activeToastNote;
+      if (!note) return;
+      this.editingNote = { mode: 'edit', note };
+      if (this.els.userNoteModalTitle) this.els.userNoteModalTitle.textContent = '✏️ Editar nota';
+      if (this.els.userNoteQuotePreview) {
+        this.els.userNoteQuotePreview.textContent = note.highlight_text ? `«${note.highlight_text}»` : '';
+      }
+      if (this.els.inputUserNoteText) this.els.inputUserNoteText.value = note.user_note || '';
+      this.els.noteToast?.classList.add('hidden');
+      this.els.userNoteModal?.classList.remove('hidden');
+      setTimeout(() => this.els.inputUserNoteText?.focus(), 60);
+    });
+
+    this.els.btnDeleteToastNote?.addEventListener('click', async () => {
+      const note = this.activeToastNote;
+      if (!note) return;
+      this.els.noteToast?.classList.add('hidden');
+      await this.onDeleteNote(note.id);
+    });
+
+    this.els.btnUserNoteSave?.addEventListener('click', async () => {
+      const ed = this.editingNote;
+      if (!ed) return;
+      const noteText = (this.els.inputUserNoteText?.value || '').trim();
+      closeNoteModal();
+      if (ed.mode === 'create') {
+        await this.onCreateNote({
+          chapter_id: this.currentChapterId,
+          highlight_text: ed.highlight_text,
+          user_note: noteText || null
+        });
+      } else if (ed.mode === 'edit' && ed.note) {
+        await this.onUpdateNote(ed.note.id, { user_note: noteText || null });
+      }
+    });
 
     const stepFont = (delta) => {
       this.fontSize = Math.max(14, Math.min(28, this.fontSize + delta));
@@ -314,9 +434,10 @@ class EpubReaderController {
         range.setStart(startPos.node, startPos.offset);
         range.setEnd(endPos.node, Math.min(endPos.node.nodeValue.length, endPos.offset + 1));
 
+        const srcCls = note.source === 'app' ? ' user-mark' : (note.source === 'synced' ? ' synced-mark' : '');
         if (startPos.node === endPos.node) {
           const mark = document.createElement('mark');
-          mark.className = 'kindle-mark';
+          mark.className = `kindle-mark${srcCls}`;
           mark.dataset.noteId = String(note.id);
           range.surroundContents(mark);
           if (note.user_note) {
@@ -338,7 +459,7 @@ class EpubReaderController {
           r2.setStart(startPos.node, startPos.offset);
           r2.setEnd(startPos.node, startPos.node.nodeValue.length);
           const mark = document.createElement('mark');
-          mark.className = 'kindle-mark';
+          mark.className = `kindle-mark${srcCls}`;
           mark.dataset.noteId = String(note.id);
           r2.surroundContents(mark);
           mark.addEventListener('click', (e) => {
@@ -352,7 +473,11 @@ class EpubReaderController {
 
   _showNoteToast(note) {
     if (!this.els.noteToast) return;
-    const typeLbl = note.user_note ? '🖍️ Subrayado + Nota' : '🖍️ Subrayado Kindle';
+    this.activeToastNote = note;
+    const srcLbl = note.source === 'app'
+      ? 'Tu nota en LeeMe'
+      : (note.source === 'synced' ? 'Sincronizado (Kindle + LeeMe)' : 'Kindle');
+    const typeLbl = note.user_note ? `🖍️ ${srcLbl} · Con nota` : `🖍️ ${srcLbl}`;
     this.els.toastNoteMeta.textContent = `${typeLbl}${note.page_number ? ` · Pág. ${note.page_number}` : ''}`;
     const qText = note.highlight_text || '';
     this.els.toastNoteQuote.textContent = qText ? `«${qText.slice(0, 200)}${qText.length > 200 ? '…' : ''}»` : '';

@@ -327,8 +327,48 @@ button, input, select { font-family: inherit; }
 .bar-fill { height: 100%; background: linear-gradient(90deg, #2c6d82, #4d9cb3); border-radius: 6px; }
 .bar-notes-tag { font-size: 11.5px; color: var(--accent); font-weight: 700; text-align: right; }
 
-/* Integrated EPUB Reader + Bottom Sheets */
-.reader-mobile-bar { display: none; gap: 8px; margin-bottom: 10px; }
+/* Integrated EPUB Reader + Fullscreen Mode + Bottom Sheets */
+.reader-immersive-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: calc(8px + env(safe-area-inset-top)) 12px 8px;
+  background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+body.reader-immersive { overflow: hidden; }
+body.reader-immersive .topbar,
+body.reader-immersive .workspace-header,
+body.reader-immersive .tabs-bar { display: none !important; }
+body.reader-immersive .container { padding: 0 !important; max-width: none !important; }
+body.reader-immersive #tab-reader {
+  position: fixed; inset: 0; z-index: 65; display: flex; flex-direction: column;
+  background: var(--bg);
+}
+body.reader-immersive .reader-layout {
+  flex: 1; min-height: 0; display: grid; grid-template-columns: 260px 1fr 300px; gap: 0; height: 100%;
+}
+body.reader-immersive .reader-toc,
+body.reader-immersive .reader-inspector {
+  position: static; max-height: none; height: 100%; border-radius: 0; border-top: none; border-bottom: none;
+}
+body.reader-immersive .reader-stage {
+  height: 100%; min-height: 0; border-radius: 0; border: none; box-shadow: none;
+}
+body.reader-immersive .reader-viewport {
+  flex: 1; min-height: 0; height: auto !important;
+  padding: 24px max(20px, calc((100% - 740px) / 2));
+}
+body.reader-immersive .reader-footer-nav {
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+}
+body.reader-immersive .kindle-note-toast {
+  bottom: calc(64px + env(safe-area-inset-bottom));
+}
+@media (max-width: 1120px) {
+  body.reader-immersive .reader-layout { grid-template-columns: 230px 1fr; }
+}
+@media (max-width: 860px) {
+  body.reader-immersive .reader-layout { grid-template-columns: 1fr; }
+  body.reader-immersive .reader-viewport { padding: 18px 16px; }
+}
 .reader-layout {
   display: grid; grid-template-columns: 260px 1fr 305px; gap: 14px; align-items: start;
 }
@@ -355,7 +395,6 @@ button, input, select { font-family: inherit; }
   .reader-inspector { grid-column: 1 / -1; position: static; max-height: none; }
 }
 @media (max-width: 860px) {
-  .reader-mobile-bar { display: flex; }
   .reader-toolbar .reader-desktop-controls { display: none; }
   .reader-layout { grid-template-columns: 1fr; }
   .reader-toc, .reader-inspector, .reader-appearance-sheet {
@@ -439,8 +478,20 @@ mark.kindle-mark {
   background: var(--highlight); color: #1e242b; padding: 1px 2px; border-radius: 3px;
   border-bottom: 2px solid var(--highlight-border); cursor: pointer;
 }
+mark.kindle-mark.user-mark { background: rgba(77, 182, 204, 0.28); border-bottom-color: #2c6d82; }
+mark.kindle-mark.synced-mark { background: rgba(52, 211, 153, 0.28); border-bottom-color: #1e874b; }
 .reader-viewport.theme-dark mark.kindle-mark { background: #6b5816; color: #fff8db; border-bottom-color: #e6b830; }
+.reader-viewport.theme-dark mark.kindle-mark.user-mark { background: #1e4b5a; color: #e2f5fa; border-bottom-color: #4db6cc; }
+.reader-viewport.theme-dark mark.kindle-mark.synced-mark { background: #1a4f38; color: #dffaea; border-bottom-color: #34d399; }
 mark.kindle-mark.active-focus { background: #ffd54f !important; color: #111 !important; box-shadow: 0 0 0 3px rgba(200,138,43,0.4); }
+
+.selection-action-bar {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: calc(66px + env(safe-area-inset-bottom)); z-index: 76;
+  display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
+  box-shadow: var(--shadow-lg);
+}
 .kindle-inline-badge {
   display: inline-block; margin-left: 4px; padding: 0 7px; border-radius: 999px;
   font-family: var(--font-sans); font-size: 11px; font-weight: 700; vertical-align: middle;

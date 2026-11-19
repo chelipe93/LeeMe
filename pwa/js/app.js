@@ -98,10 +98,42 @@
       onSelectNode: renderGraphNodeInspector,
       onSelectEdge: renderGraphEdgeInspector
     });
+    const refreshBookNotes = async (reopenChapter = true) => {
+      if (!state.currentBook?.book?.id) return;
+      const fresh = await BiblioAPI.getBookDetail(state.currentBook.book.id);
+      state.currentBook = fresh;
+      const curCh = state.reader.currentChapterId;
+      state.reader.bookData = fresh;
+      state.reader._renderToc();
+      if (reopenChapter && curCh) {
+        await state.reader.openChapter(curCh, { preserveScroll: true });
+      }
+      renderNotesTab();
+      renderOverview();
+    };
+
     state.reader = new EpubReaderController({
       onNavigateCharacter: (charId) => {
         switchTab('characters');
         setTimeout(() => state.graph.focusCharacter(charId), 120);
+      },
+      onCreateNote: async ({ chapter_id, highlight_text, user_note }) => {
+        if (!state.currentBook?.book?.id) return;
+        await BiblioAPI.addUserNote({
+          book_id: state.currentBook.book.id,
+          chapter_id,
+          highlight_text,
+          user_note
+        });
+        await refreshBookNotes(true);
+      },
+      onUpdateNote: async (noteId, patch) => {
+        await BiblioAPI.updateNote(noteId, patch);
+        await refreshBookNotes(true);
+      },
+      onDeleteNote: async (noteId) => {
+        await BiblioAPI.deleteNote(noteId);
+        await refreshBookNotes(true);
       }
     });
 
@@ -167,6 +199,30 @@
 
     document.getElementById('btnQuickRead').addEventListener('click', () => switchTab('reader'));
     document.getElementById('btnQuickGraph').addEventListener('click', () => switchTab('characters'));
+    document.getElementById('btnExitReaderFullscreen')?.addEventListener('click', () => switchTab('overview'));
+
+    const btnSyncPdf = document.getElementById('btnSyncKindlePdf');
+    const inpSyncPdf = document.getElementById('inputSyncKindlePdf');
+    btnSyncPdf?.addEventListener('click', () => inpSyncPdf?.click());
+    inpSyncPdf?.addEventListener('change', async () => {
+      const f = inpSyncPdf.files[0];
+      if (!f || !state.currentBook?.book?.id) return;
+      showLoading('Sincronizando subrayados y notas de Kindle…', 55);
+      try {
+        const res = await BiblioAPI.syncKindlePdf(state.currentBook.book.id, f);
+        inpSyncPdf.value = '';
+        const fresh = await BiblioAPI.getBookDetail(state.currentBook.book.id);
+        state.currentBook = fresh;
+        state.reader.loadBook(fresh);
+        renderOverview();
+        renderNotesTab();
+        showAlert(`Sincronización Kindle lista: ${res.added} nueva(s) y ${res.merged} combinada(s) con tus notas.`, 'ok');
+      } catch (err) {
+        showAlert(`Error sincronizando PDF Kindle: ${esc(err.message)}`, 'err');
+      } finally {
+        hideLoading();
+      }
+    });
 
     const openTechModal = () => els.techInfoModal?.classList.remove('hidden');
     const closeTechModal = () => els.techInfoModal?.classList.add('hidden');
@@ -445,6 +501,7 @@
 
   function showLibraryView() {
     state.reader?.closeAllSheets();
+    document.body.classList.remove('reader-immersive');
     els.viewWorkspace.classList.add('hidden');
     els.viewLibrary.classList.remove('hidden');
     els.btnBackLibrary.classList.add('hidden');
@@ -493,6 +550,7 @@
   function switchTab(tabName) {
     state.reader?.closeAllSheets();
     state.activeTab = tabName;
+    document.body.classList.toggle('reader-immersive', tabName === 'reader');
     document.querySelectorAll('#workspaceTabs .tab-btn').forEach((b) => {
       b.classList.toggle('active', b.dataset.tab === tabName);
     });
@@ -908,7 +966,7 @@
       return true;
     });
 
-    document.getElementById('notesStatsBar').textContent = `Mostrando ${filtered.length} de ${(d.notes || []).length} entradas extraídas del Bloc de Notas Kindle.`;
+    document.getElementById('notesStatsBar').textContent = `Mostrando ${filtered.length} de ${(d.notes || []).length} notas y subrayados (Kindle + LeeMe).`;
 
     const container = document.getElementById('notesContainer');
     if (!filtered.length) {
