@@ -1,7 +1,7 @@
 /**
  * Service Worker de LeeMe PWA: precaché completa y scope dinámico para GitHub Pages / LAN.
  */
-const CACHE_NAME = 'leeme-pwa-v4';
+const CACHE_NAME = 'leeme-pwa-v8';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -15,7 +15,6 @@ const ASSETS_TO_CACHE = [
   './js/parsers/zip-reader.js',
   './js/parsers/epub-parser.js',
   './js/offline-api.js',
-  './js/ui/mindmap.js',
   './js/ui/graph.js',
   './js/ui/reader.js',
   './js/app.js',
@@ -28,8 +27,7 @@ const ASSETS_TO_CACHE = [
   './js/worker/ml-concepts.js',
   './js/worker/ml-kmeans.js',
   './js/worker/ml-characters.js',
-  './js/worker/ml-graph.js',
-  './js/worker/ml-mindmap.js'
+  './js/worker/ml-graph.js'
 ];
 
 self.addEventListener('install', (event) => {
@@ -61,6 +59,32 @@ self.addEventListener('fetch', (event) => {
   if (!url.pathname.startsWith(scopePath)) return;
   if (url.pathname.includes('/cert/')) return;
 
+  const isAppShell = req.mode === 'navigate'
+    || url.pathname.endsWith('.html')
+    || url.pathname.endsWith('.js')
+    || url.pathname.endsWith('.css')
+    || url.pathname.endsWith('.webmanifest')
+    || url.pathname === scopePath;
+
+  if (isAppShell) {
+    event.respondWith(
+      fetch(req)
+        .then((res) => {
+          if (res && res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+          }
+          return res;
+        })
+        .catch(() => caches.match(req).then((cached) => {
+          if (cached) return cached;
+          if (req.mode === 'navigate') return caches.match('./index.html');
+          return new Response('', { status: 504, statusText: 'Offline' });
+        }))
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(req).then((cached) => {
       if (cached) return cached;
@@ -72,12 +96,7 @@ self.addEventListener('fetch', (event) => {
           }
           return res;
         })
-        .catch(() => {
-          if (req.mode === 'navigate') {
-            return caches.match('./index.html');
-          }
-          return new Response('', { status: 504, statusText: 'Offline' });
-        });
+        .catch(() => new Response('', { status: 504, statusText: 'Offline' }));
     })
   );
 });

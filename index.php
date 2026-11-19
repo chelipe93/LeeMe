@@ -1,6 +1,6 @@
 <?php
 /**
- * LeeMe · Aplicación Web de Análisis Literario con Machine Learning Clásico (Sin LLM)
+ * LeeMe · Aplicación Web de Análisis Literario con Machine Learning Clásico 
  * Stack: PHP + Vanilla JavaScript + MySQL (mysqli) + Apache2
  */
 ?><!DOCTYPE html>
@@ -17,7 +17,7 @@
       <div class="brand-mark">L</div>
       <div>
         <span class="brand-title">LeeMe</span>
-        <span class="brand-sub">Lector EPUB · Notas Kindle · Machine Learning Clásico (sin LLM)</span>
+        <span class="brand-sub">Lector EPUB · Notas Kindle · Resúmenes · Personajes</span>
       </div>
     </div>
     <div class="topbar-actions">
@@ -40,8 +40,7 @@
           <h1 class="card-title">Subir Libro EPUB y Bloc de Notas Kindle (PDF)</h1>
           <p class="card-sub">
             Sube tu libro en formato <strong>.epub</strong> junto al PDF de subrayados y notas exportado desde Kindle.
-            Nuestro motor de <strong>Machine Learning clásico en PHP</strong> (sin LLM) alineará tus notas al texto,
-            generará mapas mentales globales y por capítulo, resúmenes extractivos, personajes y grafo de relaciones.
+            LeeMe ubicará tus notas dentro del texto y generará resúmenes por capítulo, la lista de personajes y un grafo con sus relaciones.
           </p>
 
           <form id="uploadForm">
@@ -73,23 +72,18 @@
         </div>
 
         <div class="card">
-          <h2 class="card-title">Pipeline de Machine Learning Clásico (Sin LLMs)</h2>
-          <p class="card-sub">
-            Todo el procesamiento se ejecuta de forma local, transparente y reproducible sobre PHP + MySQL:
-          </p>
-          <ul style="margin:0; padding-left:18px; font-size:13.5px; color:var(--ink-soft); display:flex; flex-direction:column; gap:7px;">
-            <li><strong>Resúmenes Extractivos:</strong> Vectorización TF-IDF + Grafo de similitud coseno + <em>TextRank</em> (PageRank d=0.85) + impulso de notas Kindle + selección MMR sin redundancia.</li>
-            <li><strong>Mapas Mentales:</strong> Extracción de conceptos TF-IDF, RAKE y bigramas PMI + agrupamiento no supervisado <em>Spherical K-Means++</em> con Silhouette Score.</li>
-            <li><strong>Personajes (NER Estadístico):</strong> Clasificador lineal por características contextuales, resolución de alias y extracción de rasgos distintivos TF-IDF.</li>
-            <li><strong>Grafo de Relaciones:</strong> Co-ocurrencia en ventana deslizante + PMI + léxico afectivo + PageRank + comunidades por Modularidad <em>Louvain</em>.</li>
-          </ul>
-          <div class="ml-badges">
-            <span class="chip primary">TextRank + MMR</span>
-            <span class="chip primary">TF-IDF + RAKE</span>
-            <span class="chip accent">Spherical K-Means++</span>
-            <span class="chip success">Louvain + PageRank</span>
-            <span class="chip">0% LLM · 100% Local</span>
-          </div>
+          <details>
+            <summary style="cursor:pointer; font-weight:700; font-size:15px;">¿Cómo analiza LeeMe tus libros?</summary>
+            <p class="card-sub" style="margin-top:8px;">
+              Todo el análisis se hace en tu propio equipo y queda guardado para consultarlo cuando quieras.
+            </p>
+            <ul style="margin:0; padding-left:18px; font-size:13.5px; color:var(--ink-soft); display:flex; flex-direction:column; gap:7px; line-height:1.5;">
+              <li><strong>Resúmenes:</strong> elige las frases más representativas de cada capítulo, dando prioridad a las que tú subrayaste en Kindle y evitando repetir ideas.</li>
+              <li><strong>Personajes:</strong> detecta los nombres que se repiten en el texto, une sus apodos o formas de llamarlos y destaca las palabras que mejor los describen.</li>
+              <li><strong>Relaciones:</strong> observa qué personajes aparecen juntos y en qué tono, para mostrar quién se relaciona con quién, quiénes son los más importantes y qué grupos forman.</li>
+              <li><strong>Temas:</strong> agrupa los capítulos que tratan asuntos parecidos según las palabras clave de cada uno.</li>
+            </ul>
+          </details>
         </div>
       </div>
 
@@ -119,7 +113,6 @@
       <nav class="tabs-bar" id="workspaceTabs">
         <button class="tab-btn active" data-tab="overview">📊 Resumen & Panel ML</button>
         <button class="tab-btn" data-tab="reader">📖 Lector EPUB</button>
-        <button class="tab-btn" data-tab="mindmap">🧠 Mapas Mentales</button>
         <button class="tab-btn" data-tab="summaries">📄 Resúmenes por Capítulo</button>
         <button class="tab-btn" data-tab="characters">🕸️ Personajes y Grafo</button>
         <button class="tab-btn" data-tab="notes">🖍️ Bloc de Notas Kindle</button>
@@ -218,36 +211,6 @@
               <h4>Notas Kindle en este Capítulo</h4>
               <div id="readerInspectorNotes" style="display:flex; flex-direction:column; gap:8px;"></div>
             </div>
-          </aside>
-        </div>
-      </div>
-
-      <!-- TAB 3: MIND MAPS -->
-      <div id="tab-mindmap" class="tab-pane hidden">
-        <div class="viz-toolbar">
-          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-            <select id="selectMindMapMode" class="input">
-              <option value="structural">🌐 Mapa Global · Estructura del Libro</option>
-              <option value="thematic">🧩 Mapa Global · Clústeres ML (K-Means++)</option>
-              <option value="chapter">📑 Mapa Mental por Capítulo</option>
-            </select>
-            <select id="selectMindMapChapter" class="input hidden"></select>
-            <input type="text" id="inputMindMapSearch" class="input" placeholder="Buscar nodo en mapa…">
-          </div>
-          <div style="display:flex; gap:6px; flex-wrap:wrap;">
-            <button class="btn btn-outline btn-sm" id="btnMmExpandAll">Expandir todo</button>
-            <button class="btn btn-outline btn-sm" id="btnMmCollapse">Contraer</button>
-            <button class="btn btn-outline btn-sm" id="btnMmZoomIn">+</button>
-            <button class="btn btn-outline btn-sm" id="btnMmZoomOut">-</button>
-            <button class="btn btn-outline btn-sm" id="btnMmFit">Ajustar</button>
-            <button class="btn btn-primary btn-sm" id="btnMmExport">⬇ Exportar SVG</button>
-          </div>
-        </div>
-        <div class="viz-stage-wrap">
-          <div id="mindmapViewport" class="mindmap-viewport"></div>
-          <aside class="viz-sidepanel" id="mindmapInspector">
-            <h3 style="margin-top:0; font-size:16px;">Inspector del Mapa Mental</h3>
-            <p class="muted">Haz clic en cualquier nodo para explorar sus detalles, métricas ML o saltar al capítulo en el lector EPUB. Haz clic en el círculo <strong>+/-</strong> de una rama para expandir o contraer.</p>
           </aside>
         </div>
       </div>
@@ -373,7 +336,6 @@
   </div>
 
   <script src="assets/js/api.js"></script>
-  <script src="assets/js/mindmap.js"></script>
   <script src="assets/js/graph.js"></script>
   <script src="assets/js/reader.js"></script>
   <script src="assets/js/app.js"></script>

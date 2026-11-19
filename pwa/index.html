@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>LeeMe · Lector EPUB, Notas Kindle y ML Offline</title>
   <meta name="theme-color" content="#0f1c24">
-  <meta name="description" content="LeeMe: Lector EPUB y analizador literario 100% offline con Machine Learning clásico (sin LLM).">
+  <meta name="description" content="LeeMe: Lector EPUB, notas Kindle y análisis literario 100% offline en tu dispositivo.">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="LeeMe">
@@ -25,6 +25,7 @@
     </div>
     <div class="topbar-actions">
       <button class="btn btn-ghost btn-sm hidden" id="btnBackLibrary">← <span class="hide-xs">Biblioteca</span></button>
+      <button class="btn btn-ghost btn-sm" id="btnOpenTechModal" title="Cómo analiza LeeMe tus libros">🧠 <span class="hide-xs">Técnicas</span></button>
       <button class="btn btn-ghost btn-sm btn-icon" id="btnThemeToggle" title="Alternar modo claro / oscuro">🌙</button>
       <button class="btn btn-accent btn-sm hidden" id="btnInstallApp">📲 Instalar</button>
       <button class="btn btn-ghost btn-sm" id="btnHelpInstall" title="Cómo instalar en celular">📱 <span class="hide-xs">Instalar</span></button>
@@ -73,32 +74,41 @@
                 ✨ Cargar Muestra: En diciembre llegaban las brisas
               </button>
               <button type="button" class="btn btn-outline btn-sm" id="btnImportBackup">
-                📥 Importar (.leeme.json)
+                📥 Restaurar respaldo
               </button>
               <input type="file" id="inputBackupFile" accept=".json,.leeme.json,.biblioml.json,application/json" class="hidden">
             </div>
           </form>
         </div>
 
-        <div class="card">
-          <details class="ml-details" id="mlDetailsBox" open>
-            <summary>Motor ML Clásico en el Dispositivo (0% LLM)</summary>
-            <p class="card-sub" style="margin-top:8px;">
-              Procesamiento reproducible ejecutado en un hilo paralelo (Web Worker) y guardado localmente:
-            </p>
-            <ul style="margin:0; padding-left:18px; font-size:13px; color:var(--ink-soft); display:flex; flex-direction:column; gap:6px;">
-              <li><strong>Resúmenes Extractivos:</strong> TF-IDF + Similitud coseno + <em>TextRank</em> (d=0.85) + impulso Kindle + MMR.</li>
-              <li><strong>Mapas Mentales:</strong> TF-IDF + RAKE + Bigramas PMI + <em>Spherical K-Means++</em> (Silhouette Score).</li>
-              <li><strong>Personajes (NER Estadístico):</strong> Clasificador logístico contextual, alias y rasgos TF-IDF.</li>
-              <li><strong>Grafo de Relaciones:</strong> Co-ocurrencia + PMI + léxico afectivo + PageRank + <em>Louvain</em>.</li>
-            </ul>
-            <div class="ml-badges">
-              <span class="chip primary">Web Worker</span>
-              <span class="chip primary">IndexedDB</span>
-              <span class="chip accent">Service Worker</span>
-              <span class="chip success">100% Offline</span>
+        <div class="side-help-stack">
+          <button type="button" class="help-trigger-card" id="btnOpenTechCard">
+            <div>
+              <h3>🧠 ¿Cómo analiza LeeMe tus libros?</h3>
+              <p>Consulta las técnicas en modo <strong>sencillo</strong> (para lectores) o <strong>técnico</strong> (modelos ML).</p>
             </div>
-          </details>
+            <span class="help-trigger-arrow">→</span>
+          </button>
+
+          <div class="card">
+            <details class="ml-details" id="freeEpubBox">
+              <summary>📚 ¿Dónde conseguir libros EPUB gratis?</summary>
+              <p class="card-sub" style="margin-top:8px;">
+                Bibliotecas legales y gratuitas (en su mayoría clásicos de dominio público):
+              </p>
+              <ul class="info-list">
+                <li><a href="https://www.gutenberg.org/ebooks/search/?query=l.es" target="_blank" rel="noopener">Project Gutenberg</a>: elige <em>«EPUB3 (E-readers incl. Send-to-Kindle)»</em>.</li>
+                <li><a href="https://es.wikisource.org" target="_blank" rel="noopener">Wikisource en español</a>: abre una obra y pulsa <em>«Descargar» → EPUB</em>.</li>
+                <li><a href="https://www.elejandria.com" target="_blank" rel="noopener">Elejandría</a>: clásicos en español; pulsa <em>«Descargar gratis»</em> → EPUB.</li>
+                <li><a href="https://standardebooks.org" target="_blank" rel="noopener">Standard Ebooks</a>: ediciones cuidadas en inglés (EPUB directo).</li>
+                <li><a href="https://www.bne.es/es/catalogos/biblioteca-digital-hispanica" target="_blank" rel="noopener">Biblioteca Digital Hispánica</a>: obras históricas de la BNE.</li>
+              </ul>
+              <p class="card-sub" style="margin-top:10px; margin-bottom:0;">
+                <strong>Cómo usarlos:</strong> descarga el <code>.epub</code> en tu celular, vuelve a LeeMe, toca <em>«Archivo EPUB»</em> y elígelo desde Descargas.
+                Para tus subrayados de Kindle, expórtalos como <em>Bloc de notas (.pdf)</em> desde la app Kindle.
+              </p>
+            </details>
+          </div>
         </div>
       </div>
 
@@ -107,7 +117,10 @@
           <h2>Biblioteca Local</h2>
           <span class="muted" id="storageUsageLabel">Almacenamiento local</span>
         </div>
-        <span class="muted" id="booksCountLabel">0 libros</span>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <span class="muted" id="booksCountLabel">0 libros</span>
+          <button type="button" class="btn btn-outline btn-sm" id="btnBackupLibrary" title="Descargar un respaldo con todos tus libros">💾 Respaldar todo</button>
+        </div>
       </div>
       <div id="booksGrid" class="books-grid"></div>
     </section>
@@ -134,9 +147,6 @@
         </button>
         <button class="tab-btn" data-tab="reader">
           <span class="tab-ico">📖</span><span class="tab-lbl">Leer</span>
-        </button>
-        <button class="tab-btn" data-tab="mindmap">
-          <span class="tab-ico">🧠</span><span class="tab-lbl">Mapas</span>
         </button>
         <button class="tab-btn" data-tab="summaries">
           <span class="tab-ico">📄</span><span class="tab-lbl">Capítulos</span>
@@ -303,39 +313,6 @@
         </div>
       </div>
 
-      <!-- TAB 3: MIND MAPS -->
-      <div id="tab-mindmap" class="tab-pane hidden">
-        <div class="viz-toolbar">
-          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; flex:1;">
-            <select id="selectMindMapMode" class="input">
-              <option value="structural">🌐 Mapa Global · Estructura</option>
-              <option value="thematic">🧩 Mapa Global · Clústeres K-Means++</option>
-              <option value="chapter">📑 Mapa Mental por Capítulo</option>
-            </select>
-            <select id="selectMindMapChapter" class="input hidden"></select>
-            <input type="text" id="inputMindMapSearch" class="input" placeholder="Buscar nodo…">
-          </div>
-          <div style="display:flex; gap:6px; flex-wrap:wrap;">
-            <button class="btn btn-outline btn-sm" id="btnMmExpandAll">Expandir</button>
-            <button class="btn btn-outline btn-sm" id="btnMmCollapse">Contraer</button>
-            <button class="btn btn-primary btn-sm" id="btnMmExport">⬇ SVG</button>
-          </div>
-        </div>
-        <div class="viz-stage-wrap">
-          <div id="mindmapViewport" class="mindmap-viewport">
-            <div class="viz-fab-controls">
-              <button type="button" class="btn" id="btnMmZoomIn" title="Acercar">+</button>
-              <button type="button" class="btn" id="btnMmZoomOut" title="Alejar">−</button>
-              <button type="button" class="btn" id="btnMmFit" title="Ajustar">Ajustar</button>
-            </div>
-          </div>
-          <aside class="viz-sidepanel" id="mindmapInspector">
-            <h3 style="margin-top:0; font-size:16px;">Inspector del Mapa Mental</h3>
-            <p class="muted">Toca cualquier nodo para explorar métricas ML o saltar al capítulo en el lector EPUB. Usa 1 dedo para mover y 2 dedos para hacer zoom.</p>
-          </aside>
-        </div>
-      </div>
-
       <!-- TAB 4: CHAPTER SUMMARIES -->
       <div id="tab-summaries" class="tab-pane hidden">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
@@ -416,6 +393,70 @@
 
   <div id="sheetBackdrop" class="sheet-backdrop hidden"></div>
 
+  <!-- MODAL TÉCNICAS DE ANÁLISIS (SENCILLO / TÉCNICO) -->
+  <div id="techInfoModal" class="modal-backdrop hidden">
+    <div class="modal" style="max-width:560px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <h2 class="card-title" style="margin:0;">🧠 ¿Cómo analiza LeeMe tus libros?</h2>
+        <button type="button" class="btn btn-outline btn-sm" id="btnTechModalCloseX">✕</button>
+      </div>
+      <p class="card-sub" style="margin-top:6px; margin-bottom:0;">
+        Todo el procesamiento se ejecuta directamente en tu dispositivo y se guarda de forma local para funcionar sin internet.
+      </p>
+
+      <div class="segmented-ctrl" role="tablist" aria-label="Nivel de detalle">
+        <button type="button" class="seg-btn active" id="btnTechSimple" data-tech-mode="simple">👤 Modo Sencillo</button>
+        <button type="button" class="seg-btn" id="btnTechAdvanced" data-tech-mode="technical">⚙️ Modo Técnico</button>
+      </div>
+
+      <div id="techPanelSimple" class="tech-list">
+        <div class="tech-item">
+          <h4>📄 Resúmenes por capítulo y del libro</h4>
+          <p>LeeMe identifica las oraciones más importantes de cada capítulo, da prioridad a los fragmentos que subrayaste en Kindle y evita repetir ideas parecidas.</p>
+        </div>
+        <div class="tech-item">
+          <h4>👥 Personajes y sus rasgos</h4>
+          <p>Encuentra los nombres que aparecen en la historia, agrupa distintas formas de llamar a la misma persona (por ejemplo, apodos o apellidos) y muestra las palabras que más la rodean.</p>
+        </div>
+        <div class="tech-item">
+          <h4>🕸️ Grafo de relaciones</h4>
+          <p>Observa qué personajes aparecen cerca unos de otros y con qué tono emocional (afinidad o tensión), detecta quiénes son los protagonistas centrales y los agrupa en círculos o grupos.</p>
+        </div>
+        <div class="tech-item">
+          <h4>🧩 Agrupación temática</h4>
+          <p>Compara el vocabulario de todos los capítulos para agrupar aquellos que tratan temas parecidos dentro de la obra.</p>
+        </div>
+      </div>
+
+      <div id="techPanelTechnical" class="tech-list hidden">
+        <div class="tech-item">
+          <h4>📄 Resúmenes Extractivos</h4>
+          <p>Vectorización <strong>TF-IDF</strong> por oración, grafo de similitud coseno con algoritmo <strong>TextRank</strong> (PageRank, <code>d = 0.85</code>), impulso de relevancia para subrayados de Kindle y selección sin redundancia mediante <strong>MMR</strong> (<code>λ = 0.72</code>).</p>
+          <div class="tech-tags"><span class="chip primary">TF-IDF</span><span class="chip primary">TextRank</span><span class="chip accent">MMR</span></div>
+        </div>
+        <div class="tech-item">
+          <h4>👥 Extracción de Personajes (NER Estadístico)</h4>
+          <p>Clasificador logístico por características contextuales en español, resolución de alias por similitud morfológica y contexto compartido, más extracción de rasgos distintivos ponderados por TF-IDF.</p>
+          <div class="tech-tags"><span class="chip primary">NER Logístico</span><span class="chip">Resolución de Alias</span></div>
+        </div>
+        <div class="tech-item">
+          <h4>🕸️ Grafo de Relaciones y Comunidades</h4>
+          <p>Matriz de co-ocurrencia en ventana deslizante normalizada por <strong>PMI</strong> (Pointwise Mutual Information), análisis de valencia con léxico afectivo en español, centralidad <strong>PageRank</strong> ponderado y detección de comunidades por modularidad <strong>Louvain</strong> (<code>γ = 1.15</code>).</p>
+          <div class="tech-tags"><span class="chip primary">PMI</span><span class="chip primary">PageRank</span><span class="chip success">Louvain</span></div>
+        </div>
+        <div class="tech-item">
+          <h4>🧩 Agrupación Temática y Arquitectura Local</h4>
+          <p>Extracción de conceptos clave (TF-IDF + RAKE + bigramas PMI) y agrupamiento no supervisado <strong>Spherical K-Means++</strong> con distancia coseno evaluado por <em>Silhouette Score</em>. Ejecutado en paralelo en un <strong>Web Worker</strong> y persistido en <strong>IndexedDB</strong>.</p>
+          <div class="tech-tags"><span class="chip accent">Spherical K-Means++</span><span class="chip">Web Worker</span><span class="chip">IndexedDB</span></div>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; margin-top:16px;">
+        <button type="button" class="btn btn-primary" id="btnTechModalClose">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL AYUDA INSTALACIÓN MÓVIL -->
   <div id="installModal" class="modal-backdrop hidden">
     <div class="modal">
@@ -458,7 +499,6 @@
   <script src="./js/parsers/zip-reader.js"></script>
   <script src="./js/parsers/epub-parser.js"></script>
   <script src="./js/offline-api.js"></script>
-  <script src="./js/ui/mindmap.js"></script>
   <script src="./js/ui/graph.js"></script>
   <script src="./js/ui/reader.js"></script>
   <script src="./js/app.js"></script>

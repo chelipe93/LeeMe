@@ -7,7 +7,6 @@
     books: [],
     currentBook: null,
     activeTab: 'overview',
-    mindmap: null,
     graph: null,
     reader: null
   };
@@ -63,7 +62,6 @@
 
   // ==================== INICIALIZACIÓN ====================
   async function init() {
-    state.mindmap = new MindMapRenderer(document.getElementById('mindmapViewport'), renderMindMapInspector);
     state.graph = new CharacterGraphRenderer(document.getElementById('graphCanvas'), {
       onSelectNode: renderGraphNodeInspector,
       onSelectEdge: renderGraphEdgeInspector
@@ -199,27 +197,6 @@
       } catch (err) {
         els.dbModalMsg.textContent = `Error: ${err.message}`;
       }
-    });
-
-    // Controles de Mapa Mental
-    const mmMode = document.getElementById('selectMindMapMode');
-    const mmCh = document.getElementById('selectMindMapChapter');
-    mmMode.addEventListener('change', () => {
-      mmCh.classList.toggle('hidden', mmMode.value !== 'chapter');
-      renderActiveMindMap();
-    });
-    mmCh.addEventListener('change', renderActiveMindMap);
-    document.getElementById('inputMindMapSearch').addEventListener('input', (e) => {
-      state.mindmap.setSearch(e.target.value);
-    });
-    document.getElementById('btnMmExpandAll').addEventListener('click', () => state.mindmap.expandAll());
-    document.getElementById('btnMmCollapse').addEventListener('click', () => state.mindmap.collapseToDepth(1));
-    document.getElementById('btnMmZoomIn').addEventListener('click', () => state.mindmap.zoom(1.2));
-    document.getElementById('btnMmZoomOut').addEventListener('click', () => state.mindmap.zoom(0.83));
-    document.getElementById('btnMmFit').addEventListener('click', () => state.mindmap.fitToScreen());
-    document.getElementById('btnMmExport').addEventListener('click', () => {
-      const slug = (state.currentBook?.book?.title || 'libro').toLowerCase().replace(/[^a-z0-9]+/g, '-');
-      state.mindmap.exportSvg(`mapa-mental-${slug}.svg`);
     });
 
     // Filtros Resúmenes
@@ -377,10 +354,9 @@
         wsCover.classList.add('hidden');
       }
 
-      // Poblar selectores de capítulos (Mapa mental, Grafo, Notas)
+      // Poblar selectores de capítulos (Grafo, Notas)
       const narrative = (detail.chapters || []).filter((c) => Number(c.is_front_matter) === 0);
       const chOptions = narrative.map((c) => `<option value="${c.id}">${esc(c.display_title)}</option>`).join('');
-      document.getElementById('selectMindMapChapter').innerHTML = chOptions;
       document.getElementById('selectGraphChapter').innerHTML = `<option value="all">Todos los capítulos (Grafo Global)</option>${chOptions}`;
       document.getElementById('selectNoteChapter').innerHTML = `<option value="all">Todos los capítulos</option>` +
         (detail.chapters || []).map((c) => `<option value="${c.id}">${esc(c.display_title)}</option>`).join('');
@@ -411,10 +387,6 @@
     document.querySelectorAll('.tab-pane').forEach((p) => {
       p.classList.toggle('hidden', p.id !== `tab-${tabName}`);
     });
-
-    if (tabName === 'mindmap') {
-      setTimeout(() => renderActiveMindMap(), 30);
-    }
     if (tabName === 'characters') {
       setTimeout(() => {
         state.graph._resize();
@@ -435,7 +407,7 @@
       { val: stats.character_count || d.characters.length, label: 'Personajes Extraídos', sub: `${stats.relation_edges || d.relations.length} vínculos · ${stats.communities_count || 0} comunidades` },
       { val: Number(stats.graph_modularity || 0).toFixed(3), label: 'Modularidad Louvain (Q)', sub: 'Cohesión de círculos narrativos' },
       { val: `${stats.kmeans_k || 0} clústeres`, label: 'Spherical K-Means++', sub: `Silhouette: ${Number(stats.kmeans_silhouette || 0).toFixed(3)}` },
-      { val: `${((stats.elapsed_ms || 0) / 1000).toFixed(2)}s`, label: 'Tiempo ML (Sin LLM)', sub: `Vocabulario: ${Number(stats.vocabulary_size || 0).toLocaleString('es')} stems` }
+      { val: `${((stats.elapsed_ms || 0) / 1000).toFixed(2)}s`, label: 'Tiempo de análisis', sub: `Vocabulario: ${Number(stats.vocabulary_size || 0).toLocaleString('es')} stems` }
     ];
 
     document.getElementById('overviewKpis').innerHTML = kpis.map((k) => `
@@ -505,56 +477,6 @@
       </div>`).join('');
   }
 
-  // ==================== TAB 3: MIND MAPS ====================
-  function renderActiveMindMap() {
-    const d = state.currentBook;
-    if (!d) return;
-    const mode = document.getElementById('selectMindMapMode').value;
-    if (mode === 'structural') {
-      state.mindmap.setData(d.analysis?.global_mindmap || null, 2);
-    } else if (mode === 'thematic') {
-      state.mindmap.setData(d.analysis?.cluster_mindmap || null, 2);
-    } else {
-      const chId = Number(document.getElementById('selectMindMapChapter').value);
-      const ch = d.chapters.find((c) => Number(c.id) === chId);
-      state.mindmap.setData(ch?.mindmap || null, null);
-    }
-  }
-
-  function renderMindMapInspector(node) {
-    const panel = document.getElementById('mindmapInspector');
-    const typeLabels = {
-      root: 'Raíz del Mapa', part: 'Parte / Sección', cluster: 'Clúster ML (K-Means++)',
-      chapter: 'Capítulo', concept: 'Concepto (TF-IDF)', phrase: 'Frase Clave (RAKE)',
-      character: 'Personaje', summary: 'Núcleo Narrativo (TextRank)',
-      note: 'Nota / Subrayado Kindle', note_group: 'Notas del Lector', group: 'Grupo'
-    };
-    const chBtn = node.chapter_id
-      ? `<button class="btn btn-primary btn-sm" id="btnMmJumpReader" style="margin-top:10px; width:100%;">📖 Abrir capítulo en Lector EPUB</button>`
-      : '';
-    const chMapBtn = (node.type === 'chapter' && node.chapter_id)
-      ? `<button class="btn btn-outline btn-sm" id="btnMmOpenChapterMap" style="margin-top:8px; width:100%;">🧠 Ver Mapa Mental de este Capítulo</button>`
-      : '';
-
-    panel.innerHTML = `
-      <span class="chip primary" style="margin-bottom:10px;">${esc(typeLabels[node.type] || node.type)}</span>
-      <h3 style="margin:0 0 8px; font-size:16px; line-height:1.35;">${esc(node.label)}</h3>
-      ${node.subtitle ? `<p class="muted" style="margin:0 0 8px;">${esc(node.subtitle)}</p>` : ''}
-      ${node.meta ? `<div style="background:#faf9f6; border:1px solid var(--border); padding:10px 12px; border-radius:8px; font-size:13px; line-height:1.55;">${esc(node.meta)}</div>` : ''}
-      ${node.children ? `<p class="muted" style="margin-top:10px;">Subnodos conectados: <strong>${node.children.length}</strong></p>` : ''}
-      ${chBtn}
-      ${chMapBtn}
-    `;
-
-    document.getElementById('btnMmJumpReader')?.addEventListener('click', () => jumpToReaderChapter(Number(node.chapter_id)));
-    document.getElementById('btnMmOpenChapterMap')?.addEventListener('click', () => {
-      document.getElementById('selectMindMapMode').value = 'chapter';
-      document.getElementById('selectMindMapChapter').classList.remove('hidden');
-      document.getElementById('selectMindMapChapter').value = String(node.chapter_id);
-      renderActiveMindMap();
-    });
-  }
-
   // ==================== TAB 4: SUMMARIES ====================
   function renderSummaries() {
     const d = state.currentBook;
@@ -599,7 +521,6 @@
               </span>
             </div>
             <div style="display:flex; gap:6px; flex-wrap:wrap;">
-              <button class="btn btn-outline btn-sm" data-open-mm="${c.id}">🧠 Mapa Mental</button>
               <button class="btn btn-primary btn-sm" data-open-read="${c.id}">📖 Leer EPUB</button>
             </div>
           </div>
@@ -639,15 +560,6 @@
 
     container.querySelectorAll('[data-open-read]').forEach((b) => {
       b.addEventListener('click', () => jumpToReaderChapter(Number(b.dataset.openRead)));
-    });
-    container.querySelectorAll('[data-open-mm]').forEach((b) => {
-      b.addEventListener('click', () => {
-        switchTab('mindmap');
-        document.getElementById('selectMindMapMode').value = 'chapter';
-        document.getElementById('selectMindMapChapter').classList.remove('hidden');
-        document.getElementById('selectMindMapChapter').value = String(b.dataset.openMm);
-        renderActiveMindMap();
-      });
     });
   }
 

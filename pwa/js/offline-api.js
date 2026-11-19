@@ -175,11 +175,37 @@ class OfflineAPIImpl {
     return this.db.exportBookBackup(bookId);
   }
 
+  /**
+   * Respaldo de toda la biblioteca: un solo archivo con todos los libros
+   * (texto, imágenes, notas, análisis y progreso de lectura).
+   */
+  async exportLibraryBackup() {
+    const books = await this.db.listBooks();
+    if (!books.length) throw new Error('No hay libros para respaldar.');
+    const items = [];
+    for (const b of books) {
+      items.push(await this.db.exportBookBackup(b.id));
+    }
+    return {
+      format: 'leeme-library-v1',
+      exported_at: new Date().toISOString(),
+      book_count: items.length,
+      books: items
+    };
+  }
+
   async importBookBackup(file) {
     const text = await file.text();
     const json = JSON.parse(text);
+    if (json && json.format === 'leeme-library-v1' && Array.isArray(json.books)) {
+      let lastId = null;
+      for (const item of json.books) {
+        lastId = await this.db.importBookBackup(item);
+      }
+      return { ok: true, book_id: lastId, count: json.books.length, library: true };
+    }
     const bookId = await this.db.importBookBackup(json);
-    return { ok: true, book_id: bookId };
+    return { ok: true, book_id: bookId, count: 1, library: false };
   }
 }
 

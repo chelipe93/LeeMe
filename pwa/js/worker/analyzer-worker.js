@@ -11,8 +11,7 @@ importScripts(
   './ml-concepts.js',
   './ml-kmeans.js',
   './ml-characters.js',
-  './ml-graph.js',
-  './ml-mindmap.js'
+  './ml-graph.js'
 );
 
 function alignNotesToChapters(notes, chapters) {
@@ -138,7 +137,7 @@ self.onmessage = async (event) => {
     const { epubData, pdfBuffer } = msg;
     const {
       KindleNotesParser, CharacterExtractor, RelationshipGraph,
-      ConceptExtractor, KMeansClusterer, Summarizer, MindMapBuilder
+      ConceptExtractor, KMeansClusterer, Summarizer
     } = self.BiblioWorker;
 
     const chapters = epubData.chapters || [];
@@ -215,38 +214,6 @@ self.onmessage = async (event) => {
       7
     );
 
-    progress(95, 'Construyendo mapas mentales globales y por capítulo…');
-    const mmBuilder = new MindMapBuilder();
-    const chapterMindMaps = {};
-    for (const k of narrKeys) {
-      chapterMindMaps[k] = mmBuilder.buildChapterMindMap(
-        k,
-        narrativeChapters[k],
-        chapterSummaries[k] || {},
-        conceptResult.chapter_keywords[k] || {},
-        characters,
-        notesByChapter[k] || []
-      );
-    }
-
-    const globalStructuralMap = mmBuilder.buildGlobalStructural(
-      epubData.metadata.title,
-      epubData.metadata.author,
-      narrativeChapters,
-      conceptResult.chapter_keywords,
-      characters,
-      notesByChapter
-    );
-    const globalThematicMap = mmBuilder.buildGlobalThematic(
-      epubData.metadata.title,
-      epubData.metadata.author,
-      clusterResult,
-      narrativeChapters,
-      conceptResult.chapter_keywords,
-      notesByChapter,
-      characters
-    );
-
     const elapsedMs = Number((performance.now() - t0).toFixed(1));
     const matchedCount = alignedNotes.filter((n) => n.matched_chapter_index !== null).length;
 
@@ -271,7 +238,7 @@ self.onmessage = async (event) => {
       algorithms: {
         'Resumen': 'TextRank (PageRank d=0.85) + TF-IDF + Kindle Boost + MMR (λ=0.72)',
         'Conceptos': 'TF-IDF Corpus + RAKE + Colocaciones Bigramas PMI',
-        'Mapa Temático': 'Spherical K-Means++ (Distancia Coseno)',
+        'Agrupación Temática': 'Spherical K-Means++ (Distancia Coseno)',
         'Personajes': 'NER Estadístico por Características (Logístico) + Resolución de Alias + Rasgos TF-IDF',
         'Grafo Relaciones': 'Co-ocurrencia Ventana Deslizante + PMI + Léxico Afectivo + PageRank + Louvain (Modularidad)'
       }
@@ -290,10 +257,7 @@ self.onmessage = async (event) => {
         aligned_notes: alignedNotes,
         chapter_summaries: chapterSummaries,
         chapter_keywords: conceptResult.chapter_keywords,
-        chapter_mindmaps: chapterMindMaps,
         global_summary: globalSummary,
-        global_structural: globalStructuralMap,
-        global_thematic: globalThematicMap,
         global_keywords: {
           concepts: conceptResult.global_concepts,
           bigrams: conceptResult.global_bigrams

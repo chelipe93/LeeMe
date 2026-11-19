@@ -141,11 +141,50 @@ button, input, select { font-family: inherit; }
   display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
 }
 .alert.warn { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
+.alert.ok { background: rgba(52, 211, 153, 0.12); border-color: #34d399; color: var(--ink); }
+.info-list { margin: 8px 0 0; padding-left: 18px; font-size: 13.5px; color: var(--ink-soft); display: flex; flex-direction: column; gap: 7px; line-height: 1.5; }
+.info-list a { color: var(--primary); font-weight: 600; }
 .alert.err { background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger); }
 
 /* Upload Hero */
-.hero-grid { display: grid; grid-template-columns: 1.25fr 1fr; gap: 16px; margin-bottom: 22px; }
+.hero-grid { display: grid; grid-template-columns: 1.35fr 0.9fr; gap: 16px; margin-bottom: 22px; align-items: start; }
 @media (max-width: 960px) { .hero-grid { grid-template-columns: 1fr; gap: 12px; margin-bottom: 18px; } }
+.side-help-stack { display: flex; flex-direction: column; gap: 12px; }
+.help-trigger-card {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 15px 16px; border-radius: var(--radius); border: 1px solid var(--border);
+  background: var(--surface); box-shadow: var(--shadow); cursor: pointer; text-align: left;
+  width: 100%; transition: border-color 0.15s, transform 0.12s;
+}
+.help-trigger-card:hover { border-color: var(--primary); transform: translateY(-1px); }
+.help-trigger-card h3 { margin: 0 0 3px; font-size: 15px; color: var(--ink); }
+.help-trigger-card p { margin: 0; font-size: 12.5px; color: var(--ink-soft); line-height: 1.4; }
+.help-trigger-arrow { font-size: 18px; color: var(--primary); font-weight: 700; flex-shrink: 0; }
+
+/* Segmented Toggle & Tech Modal */
+.segmented-ctrl {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px;
+  background: var(--surface-alt); border: 1px solid var(--border); border-radius: 10px;
+  margin: 12px 0 14px;
+}
+.seg-btn {
+  padding: 8px 12px; border-radius: 7px; border: none; background: transparent;
+  color: var(--ink-soft); font-size: 13px; font-weight: 700; cursor: pointer;
+  transition: all 0.15s; min-height: 36px;
+}
+.seg-btn.active { background: var(--primary); color: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.14); }
+.tech-list { display: flex; flex-direction: column; gap: 10px; }
+.tech-item {
+  padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--surface-soft);
+}
+.tech-item h4 { margin: 0 0 4px; font-size: 14px; color: var(--primary); display: flex; align-items: center; gap: 6px; }
+.tech-item p { margin: 0; font-size: 13px; color: var(--ink); line-height: 1.5; }
+.tech-item .tech-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+@media (max-width: 640px) {
+  .books-grid { grid-template-columns: 1fr; }
+  .book-card-actions .btn { min-height: 38px; }
+}
 
 .card {
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
@@ -249,7 +288,7 @@ button, input, select { font-family: inherit; }
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
     margin: 0; border-radius: 0; border: none; border-top: 1px solid var(--border);
     padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
-    display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px;
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px;
     background: var(--surface);
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.12);
     overflow: visible;
@@ -437,17 +476,10 @@ mark.kindle-mark.active-focus { background: #ffd54f !important; color: #111 !imp
 }
 @media (max-width: 980px) { .viz-stage-wrap { grid-template-columns: 1fr; } }
 
-.mindmap-viewport {
-  position: relative; height: 580px; overflow: hidden; cursor: grab; touch-action: none;
-  background: radial-gradient(var(--border) 1px, transparent 1px) 0 0 / 22px 22px, var(--surface-soft);
-}
-.mindmap-viewport:active { cursor: grabbing; }
-.mindmap-viewport svg { width: 100%; height: 100%; display: block; touch-action: none; }
-
 .graph-viewport { position: relative; height: 580px; overflow: hidden; background: #111820; touch-action: none; }
 .graph-viewport canvas { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
 @media (max-width: 640px) {
-  .mindmap-viewport, .graph-viewport { height: 54dvh; min-height: 360px; }
+  .graph-viewport { height: 54dvh; min-height: 360px; }
 }
 
 .viz-fab-controls {

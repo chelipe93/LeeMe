@@ -212,9 +212,7 @@ class BiblioDB {
               });
             }
 
-            // 6. Análisis global (parcheando chapter_id en mapas mentales y clústeres)
-            const globalStructural = this._patchMindMapChapterIds(bundle.global_structural, chapterIdxToId);
-            const globalThematic = this._patchMindMapChapterIds(bundle.global_thematic, chapterIdxToId);
+            // 6. Análisis global (clústeres)
             const clustersMapped = (bundle.clusters || []).map((cl) => ({
               ...cl,
               member_chapter_ids: (cl.members || []).map((k) => chapterIdxToId[k]).filter(Boolean)
@@ -222,8 +220,6 @@ class BiblioDB {
 
             analysisStore.put({
               book_id: bookId,
-              global_mindmap: globalStructural,
-              cluster_mindmap: globalThematic,
               global_keywords: bundle.global_keywords || { concepts: [], bigrams: [] },
               clusters: clustersMapped,
               stats: stats,
@@ -292,7 +288,6 @@ class BiblioDB {
             const chIdx = ch.chapter_index;
             const sumData = bundle.chapter_summaries?.[chIdx] || null;
             const kwData = bundle.chapter_keywords?.[chIdx] || null;
-            const mmData = bundle.chapter_mindmaps?.[chIdx] || null;
 
             const chReq = chStore.add({
               book_id: bookId,
@@ -306,33 +301,12 @@ class BiblioDB {
               html_content: ch.html_content || '',
               summary_text: sumData ? sumData.summary_text : null,
               summary: sumData,
-              keywords: kwData,
-              mindmap: mmData
+              keywords: kwData
             });
 
             chReq.onsuccess = () => {
               const realId = Number(chReq.result);
               chapterIdxToId[chIdx] = realId;
-              // Parchear chapter_id dentro del mindmap del propio capítulo
-              if (mmData) {
-                const patchedMm = this._patchMindMapChapterIds(mmData, chapterIdxToId);
-                chStore.put({
-                  id: realId,
-                  book_id: bookId,
-                  chapter_index: chIdx,
-                  part_title: ch.part_title || null,
-                  title: ch.title,
-                  display_title: ch.display_title,
-                  href: ch.href,
-                  is_front_matter: Number(ch.is_front_matter ? 1 : 0),
-                  word_count: Number(ch.word_count || 0),
-                  html_content: ch.html_content || '',
-                  summary_text: sumData ? sumData.summary_text : null,
-                  summary: sumData,
-                  keywords: kwData,
-                  mindmap: patchedMm
-                });
-              }
               pendingChapters--;
               if (pendingChapters === 0) {
                 afterChaptersInserted();
@@ -342,18 +316,6 @@ class BiblioDB {
         }
       };
     });
-  }
-
-  _patchMindMapChapterIds(node, chapterIdxToId) {
-    if (!node || typeof node !== 'object') return node;
-    const copy = { ...node };
-    if (copy.chapter_id !== undefined && chapterIdxToId[copy.chapter_id] !== undefined) {
-      copy.chapter_id = chapterIdxToId[copy.chapter_id];
-    }
-    if (Array.isArray(copy.children)) {
-      copy.children = copy.children.map((ch) => this._patchMindMapChapterIds(ch, chapterIdxToId));
-    }
-    return copy;
   }
 
   async getBookDetail(bookId) {
@@ -620,9 +582,9 @@ class BiblioDB {
               const a = backup.analysis;
               tx.objectStore('analysis').put({
                 ...a,
+                global_mindmap: undefined,
+                cluster_mindmap: undefined,
                 book_id: newBookId,
-                global_mindmap: this._patchMindMapChapterIds(a.global_mindmap, chMap),
-                cluster_mindmap: this._patchMindMapChapterIds(a.cluster_mindmap, chMap),
                 clusters: (a.clusters || []).map((cl) => ({
                   ...cl,
                   member_chapter_ids: (cl.member_chapter_ids || []).map((cid) => chMap[cid]).filter(Boolean)
@@ -668,14 +630,11 @@ class BiblioDB {
 
         if (remCh === 0) afterCh();
         oldChapters.forEach((c) => {
-          const { id: oldId, ...rest } = c;
+          const { id: oldId, mindmap: _mm, ...rest } = c;
           const reqCh = chStore.add({ ...rest, book_id: newBookId });
           reqCh.onsuccess = () => {
             const newId = Number(reqCh.result);
             chMap[oldId] = newId;
-            if (c.mindmap) {
-              chStore.put({ ...rest, id: newId, book_id: newBookId, mindmap: this._patchMindMapChapterIds(c.mindmap, chMap) });
-            }
             remCh--;
             if (remCh === 0) afterCh();
           };

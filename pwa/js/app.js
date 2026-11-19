@@ -6,7 +6,6 @@
     books: [],
     currentBook: null,
     activeTab: 'overview',
-    mindmap: null,
     graph: null,
     reader: null,
     deferredInstallPrompt: null
@@ -42,7 +41,7 @@
     loadingProgressPct: document.getElementById('loadingProgressPct'),
     installModal: document.getElementById('installModal'),
     btnInstallModalClose: document.getElementById('btnInstallModalClose'),
-    mlDetailsBox: document.getElementById('mlDetailsBox')
+    techInfoModal: document.getElementById('techInfoModal')
   };
 
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (m) => ({
@@ -95,11 +94,6 @@
     } catch (_) {}
     applyGlobalTheme(savedTheme);
 
-    if (els.mlDetailsBox && window.innerWidth <= 640) {
-      els.mlDetailsBox.removeAttribute('open');
-    }
-
-    state.mindmap = new MindMapRenderer(document.getElementById('mindmapViewport'), renderMindMapInspector);
     state.graph = new CharacterGraphRenderer(document.getElementById('graphCanvas'), {
       onSelectNode: renderGraphNodeInspector,
       onSelectEdge: renderGraphEdgeInspector
@@ -173,6 +167,25 @@
 
     document.getElementById('btnQuickRead').addEventListener('click', () => switchTab('reader'));
     document.getElementById('btnQuickGraph').addEventListener('click', () => switchTab('characters'));
+
+    const openTechModal = () => els.techInfoModal?.classList.remove('hidden');
+    const closeTechModal = () => els.techInfoModal?.classList.add('hidden');
+    document.getElementById('btnOpenTechModal')?.addEventListener('click', openTechModal);
+    document.getElementById('btnOpenTechCard')?.addEventListener('click', openTechModal);
+    document.getElementById('btnTechModalClose')?.addEventListener('click', closeTechModal);
+    document.getElementById('btnTechModalCloseX')?.addEventListener('click', closeTechModal);
+    els.techInfoModal?.addEventListener('click', (e) => {
+      if (e.target === els.techInfoModal) closeTechModal();
+    });
+    const setTechMode = (mode) => {
+      const isSimple = mode !== 'technical';
+      document.getElementById('btnTechSimple')?.classList.toggle('active', isSimple);
+      document.getElementById('btnTechAdvanced')?.classList.toggle('active', !isSimple);
+      document.getElementById('techPanelSimple')?.classList.toggle('hidden', !isSimple);
+      document.getElementById('techPanelTechnical')?.classList.toggle('hidden', isSimple);
+    };
+    document.getElementById('btnTechSimple')?.addEventListener('click', () => setTechMode('simple'));
+    document.getElementById('btnTechAdvanced')?.addEventListener('click', () => setTechMode('technical'));
 
     document.querySelectorAll('#workspaceTabs .tab-btn').forEach((btn) => {
       btn.addEventListener('click', () => switchTab(btn.dataset.tab));
@@ -249,6 +262,26 @@
     });
 
     els.btnImportBackup.addEventListener('click', () => els.inputBackup.click());
+
+    document.getElementById('btnBackupLibrary').addEventListener('click', async () => {
+      hideAlert();
+      showLoading('Preparando el respaldo de toda tu biblioteca…', 60);
+      try {
+        const data = await BiblioAPI.exportLibraryBackup();
+        const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+        const stamp = new Date().toISOString().slice(0, 10);
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `biblioteca-leeme-${stamp}.leeme.json`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+        showAlert(`Respaldo listo: ${data.book_count} libro(s). Guarda el archivo en un lugar seguro (Drive, correo o tu PC) y usa «Restaurar respaldo» para recuperarlo.`, 'ok');
+      } catch (err) {
+        showAlert(`No se pudo crear el respaldo: ${esc(err.message)}`, 'err');
+      } finally {
+        hideLoading();
+      }
+    });
     els.inputBackup.addEventListener('change', async () => {
       const f = els.inputBackup.files[0];
       if (!f) return;
@@ -257,31 +290,16 @@
         const res = await BiblioAPI.importBookBackup(f);
         els.inputBackup.value = '';
         await loadBooks();
-        await openBook(res.book_id);
+        if (res.library) {
+          showAlert(`Biblioteca restaurada: ${res.count} libro(s) recuperados.`, 'ok');
+        } else {
+          await openBook(res.book_id);
+        }
       } catch (err) {
         showAlert(`Error importando respaldo: ${esc(err.message)}`, 'err');
       } finally {
         hideLoading();
       }
-    });
-
-    // Mapa mental
-    const mmMode = document.getElementById('selectMindMapMode');
-    const mmCh = document.getElementById('selectMindMapChapter');
-    mmMode.addEventListener('change', () => {
-      mmCh.classList.toggle('hidden', mmMode.value !== 'chapter');
-      renderActiveMindMap();
-    });
-    mmCh.addEventListener('change', renderActiveMindMap);
-    document.getElementById('inputMindMapSearch').addEventListener('input', (e) => state.mindmap.setSearch(e.target.value));
-    document.getElementById('btnMmExpandAll').addEventListener('click', () => state.mindmap.expandAll());
-    document.getElementById('btnMmCollapse').addEventListener('click', () => state.mindmap.collapseToDepth(1));
-    document.getElementById('btnMmZoomIn').addEventListener('click', () => state.mindmap.zoom(1.2));
-    document.getElementById('btnMmZoomOut').addEventListener('click', () => state.mindmap.zoom(0.83));
-    document.getElementById('btnMmFit').addEventListener('click', () => state.mindmap.fitToScreen());
-    document.getElementById('btnMmExport').addEventListener('click', () => {
-      const slug = (state.currentBook?.book?.title || 'libro').toLowerCase().replace(/[^a-z0-9]+/g, '-');
-      state.mindmap.exportSvg(`mapa-mental-leeme-${slug}.svg`);
     });
 
     document.getElementById('inputSummarySearch').addEventListener('input', renderSummaries);
@@ -451,7 +469,6 @@
 
       const narrative = (detail.chapters || []).filter((c) => Number(c.is_front_matter) === 0);
       const chOptions = narrative.map((c) => `<option value="${c.id}">${esc(c.display_title)}</option>`).join('');
-      document.getElementById('selectMindMapChapter').innerHTML = chOptions;
       document.getElementById('selectGraphChapter').innerHTML = `<option value="all">Todos los capítulos (Grafo Global)</option>${chOptions}`;
       document.getElementById('selectNoteChapter').innerHTML = `<option value="all">Todos los capítulos</option>` +
         (detail.chapters || []).map((c) => `<option value="${c.id}">${esc(c.display_title)}</option>`).join('');
@@ -482,7 +499,6 @@
     document.querySelectorAll('.tab-pane').forEach((p) => {
       p.classList.toggle('hidden', p.id !== `tab-${tabName}`);
     });
-    if (tabName === 'mindmap') setTimeout(() => renderActiveMindMap(), 30);
     if (tabName === 'characters') {
       setTimeout(() => {
         state.graph._resize();
@@ -567,56 +583,6 @@
       </div>`).join('');
   }
 
-  // ==================== TAB 3: MIND MAPS ====================
-  function renderActiveMindMap() {
-    const d = state.currentBook;
-    if (!d) return;
-    const mode = document.getElementById('selectMindMapMode').value;
-    if (mode === 'structural') {
-      state.mindmap.setData(d.analysis?.global_mindmap || null, 2);
-    } else if (mode === 'thematic') {
-      state.mindmap.setData(d.analysis?.cluster_mindmap || null, 2);
-    } else {
-      const chId = Number(document.getElementById('selectMindMapChapter').value);
-      const ch = d.chapters.find((c) => Number(c.id) === chId);
-      state.mindmap.setData(ch?.mindmap || null, null);
-    }
-  }
-
-  function renderMindMapInspector(node) {
-    const panel = document.getElementById('mindmapInspector');
-    const typeLabels = {
-      root: 'Raíz del Mapa', part: 'Parte / Sección', cluster: 'Clúster ML (K-Means++)',
-      chapter: 'Capítulo', concept: 'Concepto (TF-IDF)', phrase: 'Frase Clave (RAKE)',
-      character: 'Personaje', summary: 'Núcleo Narrativo (TextRank)',
-      note: 'Nota / Subrayado Kindle', note_group: 'Notas del Lector', group: 'Grupo'
-    };
-    const chBtn = node.chapter_id
-      ? `<button class="btn btn-primary btn-sm" id="btnMmJumpReader" style="margin-top:10px; width:100%;">📖 Abrir capítulo en Lector EPUB</button>`
-      : '';
-    const chMapBtn = (node.type === 'chapter' && node.chapter_id)
-      ? `<button class="btn btn-outline btn-sm" id="btnMmOpenChapterMap" style="margin-top:8px; width:100%;">🧠 Ver Mapa Mental de este Capítulo</button>`
-      : '';
-
-    panel.innerHTML = `
-      <span class="chip primary" style="margin-bottom:10px;">${esc(typeLabels[node.type] || node.type)}</span>
-      <h3 style="margin:0 0 8px; font-size:16px; line-height:1.35;">${esc(node.label)}</h3>
-      ${node.subtitle ? `<p class="muted" style="margin:0 0 8px;">${esc(node.subtitle)}</p>` : ''}
-      ${node.meta ? `<div style="background:var(--surface-soft); border:1px solid var(--border); padding:10px 12px; border-radius:8px; font-size:13px; line-height:1.55;">${esc(node.meta)}</div>` : ''}
-      ${node.children ? `<p class="muted" style="margin-top:10px;">Subnodos conectados: <strong>${node.children.length}</strong></p>` : ''}
-      ${chBtn}
-      ${chMapBtn}
-    `;
-
-    document.getElementById('btnMmJumpReader')?.addEventListener('click', () => jumpToReaderChapter(Number(node.chapter_id)));
-    document.getElementById('btnMmOpenChapterMap')?.addEventListener('click', () => {
-      document.getElementById('selectMindMapMode').value = 'chapter';
-      document.getElementById('selectMindMapChapter').classList.remove('hidden');
-      document.getElementById('selectMindMapChapter').value = String(node.chapter_id);
-      renderActiveMindMap();
-    });
-  }
-
   // ==================== TAB 4: SUMMARIES ====================
   function renderSummaries() {
     const d = state.currentBook;
@@ -661,7 +627,6 @@
               </span>
             </div>
             <div style="display:flex; gap:6px; flex-wrap:wrap;">
-              <button class="btn btn-outline btn-sm" data-open-mm="${c.id}">🧠 Mapa Mental</button>
               <button class="btn btn-primary btn-sm" data-open-read="${c.id}">📖 Leer EPUB</button>
             </div>
           </div>
@@ -701,15 +666,6 @@
 
     container.querySelectorAll('[data-open-read]').forEach((b) => {
       b.addEventListener('click', () => jumpToReaderChapter(Number(b.dataset.openRead)));
-    });
-    container.querySelectorAll('[data-open-mm]').forEach((b) => {
-      b.addEventListener('click', () => {
-        switchTab('mindmap');
-        document.getElementById('selectMindMapMode').value = 'chapter';
-        document.getElementById('selectMindMapChapter').classList.remove('hidden');
-        document.getElementById('selectMindMapChapter').value = String(b.dataset.openMm);
-        renderActiveMindMap();
-      });
     });
   }
 
