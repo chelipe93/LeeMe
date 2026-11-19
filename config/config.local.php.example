@@ -1,0 +1,13 @@
+<?php
+/**
+ * Copia este archivo a config.local.php y ajusta tus credenciales de MySQL.
+ */
+return [
+    'db' => [
+        'host' => '127.0.0.1',
+        'port' => 3306,
+        'user' => 'root',
+        'pass' => '',
+        'name' => 'biblioml',
+    ],
+];

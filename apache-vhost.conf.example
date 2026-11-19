@@ -1,0 +1,22 @@
+# Ejemplo de configuración para Apache 2.4 (Windows: C:\Apache24\conf\httpd.conf o extra\httpd-vhosts.conf)
+# Opción A: Publicar como Alias en http://localhost/biblioml/
+
+Alias /biblioml "C:/Users/Felipe/Documents/Libros"
+<Directory "C:/Users/Felipe/Documents/Libros">
+    Options FollowSymLinks
+    AllowOverride All
+    Require all granted
+    DirectoryIndex index.php
+</Directory>
+
+# Opción B: VirtualHost dedicado en http://biblioml.local/
+# <VirtualHost *:80>
+#     ServerName biblioml.local
+#     DocumentRoot "C:/Users/Felipe/Documents/Libros"
+#     <Directory "C:/Users/Felipe/Documents/Libros">
+#         Options FollowSymLinks
+#         AllowOverride All
+#         Require all granted
+#         DirectoryIndex index.php
+#     </Directory>
+# </VirtualHost>

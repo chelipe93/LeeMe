@@ -1,0 +1,30 @@
+# Apache 2.4 Configuration for BiblioML
+Options -Indexes
+DirectoryIndex index.php
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Bloquear acceso directo a directorios internos y archivos sensibles
+    RewriteRule ^(config|database|src|storage/uploads)/ - [F,L]
+    RewriteRule \.(sql|example|log)$ - [F,L]
+</IfModule>
+
+# Límites de carga para EPUB y PDF grandes (requiere mod_php)
+<IfModule mod_php7.c>
+    php_value upload_max_filesize 50M
+    php_value post_max_size 64M
+    php_value max_execution_time 180
+    php_value memory_limit 256M
+</IfModule>
+<IfModule mod_php.c>
+    php_value upload_max_filesize 50M
+    php_value post_max_size 64M
+    php_value max_execution_time 180
+    php_value memory_limit 256M
+</IfModule>
+
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+</IfModule>

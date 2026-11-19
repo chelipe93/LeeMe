@@ -1,0 +1,28 @@
+# Secretos y configuración local
+config/config.local.php
+
+# Libros y notas personales del usuario
+En diciembre llegaban las brisas/
+*.epub
+*.pdf
+
+# Almacenamiento local generado en tiempo de ejecución
+storage/uploads/*
+!storage/uploads/.htaccess
+storage/books/*
+!storage/books/.gitkeep
+storage/covers/*
+!storage/covers/.gitkeep
+
+# Certificados SSL / CA locales (nunca subir claves o certificados locales)
+pwa/cert/
+*.key
+*.pem
+*.crt
+*.csr
+*.srl
+
+# Logs y temporales
+*.log
+.DS_Store
+Thumbs.db

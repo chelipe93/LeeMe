@@ -1,0 +1,20 @@
+Options -Indexes
+DirectoryIndex index.html
+
+<IfModule mod_mime.c>
+    AddType application/manifest+json .webmanifest
+    AddType application/x-x509-ca-cert .crt
+</IfModule>
+
+<FilesMatch "\.(key|pem)$">
+    Require all denied
+</FilesMatch>
+
+<IfModule mod_headers.c>
+    <Files "sw.js">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+    </Files>
+    <Files "manifest.webmanifest">
+        Header set Cache-Control "no-cache"
+    </Files>
+</IfModule>
